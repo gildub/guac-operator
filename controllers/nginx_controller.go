@@ -83,8 +83,8 @@ type NginxReconciler struct {
 func (r *NginxReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := log.FromContext(ctx)
 
-	// Fetch the Memcached instance
-	// The purpose is check if the Custom Resource for the Kind Memcached
+	// Fetch the Nginx instance
+	// The purpose is check if the Custom Resource for the Kind Nginx
 	// is applied on the cluster if not we return nil to stop the reconciliation
 	nginx := &guacv1alpha1.Nginx{}
 	err := r.Get(ctx, req.NamespacedName, nginx)
@@ -104,7 +104,7 @@ func (r *NginxReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	if nginx.Status.Conditions == nil || len(nginx.Status.Conditions) == 0 {
 		meta.SetStatusCondition(&nginx.Status.Conditions, metav1.Condition{Type: typeAvailableNginx, Status: metav1.ConditionUnknown, Reason: "Reconciling", Message: "Starting reconciliation"})
 		if err = r.Status().Update(ctx, nginx); err != nil {
-			log.Error(err, "Failed to update Memcached status")
+			log.Error(err, "Failed to update Nginx status")
 			return ctrl.Result{}, err
 		}
 
@@ -126,7 +126,8 @@ func (r *NginxReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		log.Info("Adding Finalizer for nginx")
 		if ok := controllerutil.AddFinalizer(nginx, NginxFinalizer); !ok {
 			log.Error(err, "Failed to add finalizer into the custom resource")
-			return ctrl.Result{Requeue: true}, nil
+			// return ctrl.Result{Requeue: true}, nil
+			return ctrl.Result{}, nil
 		}
 
 		if err = r.Update(ctx, nginx); err != nil {
@@ -135,12 +136,12 @@ func (r *NginxReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		}
 	}
 
-	// Check if the Memcached instance is marked to be deleted, which is
+	// Check if the Nginx instance is marked to be deleted, which is
 	// indicated by the deletion timestamp being set.
-	isMemcachedMarkedToBeDeleted := nginx.GetDeletionTimestamp() != nil
-	if isMemcachedMarkedToBeDeleted {
+	isNginxMarkedToBeDeleted := nginx.GetDeletionTimestamp() != nil
+	if isNginxMarkedToBeDeleted {
 		if controllerutil.ContainsFinalizer(nginx, NginxFinalizer) {
-			log.Info("Performing Finalizer Operations for Memcached before delete CR")
+			log.Info("Performing Finalizer Operations for Nginx before delete CR")
 
 			// Let's add here an status "Downgrade" to define that this resource begin its process to be terminated.
 			meta.SetStatusCondition(&nginx.Status.Conditions, metav1.Condition{Type: typeDegradedNginx,
@@ -148,15 +149,15 @@ func (r *NginxReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 				Message: fmt.Sprintf("Performing finalizer operations for the custom resource: %s ", nginx.Name)})
 
 			if err := r.Status().Update(ctx, nginx); err != nil {
-				log.Error(err, "Failed to update Memcached status")
+				log.Error(err, "Failed to update Nginx status")
 				return ctrl.Result{}, err
 			}
 
 			// Perform all operations required before remove the finalizer and allow
 			// the Kubernetes API to remove the custom resource.
-			r.doFinalizerOperationsForMemcached(nginx)
+			r.doFinalizerOperationsForNginx(nginx)
 
-			// TODO(user): If you add operations to the doFinalizerOperationsForMemcached method
+			// TODO(user): If you add operations to the doFinalizerOperationsForNginx method
 			// then you need to ensure that all worked fine before deleting and updating the Downgrade status
 			// otherwise, you should requeue here.
 
@@ -174,18 +175,18 @@ func (r *NginxReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 				Message: fmt.Sprintf("Finalizer operations for custom resource %s name were successfully accomplished", nginx.Name)})
 
 			if err := r.Status().Update(ctx, nginx); err != nil {
-				log.Error(err, "Failed to update Memcached status")
+				log.Error(err, "Failed to update Nginx status")
 				return ctrl.Result{}, err
 			}
 
-			log.Info("Removing Finalizer for Memcached after successfully perform the operations")
+			log.Info("Removing Finalizer for Nginx after successfully perform the operations")
 			if ok := controllerutil.RemoveFinalizer(nginx, NginxFinalizer); !ok {
-				log.Error(err, "Failed to remove finalizer for Memcached")
+				log.Error(err, "Failed to remove finalizer for Nginx")
 				return ctrl.Result{Requeue: true}, nil
 			}
 
 			if err := r.Update(ctx, nginx); err != nil {
-				log.Error(err, "Failed to remove finalizer for Memcached")
+				log.Error(err, "Failed to remove finalizer for Nginx")
 				return ctrl.Result{}, err
 			}
 		}
@@ -199,7 +200,7 @@ func (r *NginxReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		// Define a new deployment
 		dep, err := r.deploymentForNginx(nginx)
 		if err != nil {
-			log.Error(err, "Failed to define new Deployment resource for Memcached")
+			log.Error(err, "Failed to define new Deployment resource for Nginx")
 
 			// The following implementation will update the status
 			meta.SetStatusCondition(&nginx.Status.Conditions, metav1.Condition{Type: typeAvailableNginx,
@@ -207,7 +208,7 @@ func (r *NginxReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 				Message: fmt.Sprintf("Failed to create Deployment for the custom resource (%s): (%s)", nginx.Name, err)})
 
 			if err := r.Status().Update(ctx, nginx); err != nil {
-				log.Error(err, "Failed to update Memcached status")
+				log.Error(err, "Failed to update Nginx status")
 				return ctrl.Result{}, err
 			}
 
@@ -232,7 +233,7 @@ func (r *NginxReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		return ctrl.Result{}, err
 	}
 
-	// The CRD API is defining that the Memcached type, have a MemcachedSpec.Size field
+	// The CRD API is defining that the Nginx type, have a NginxSpec.Size field
 	// to set the quantity of Deployment instances is the desired state on the cluster.
 	// Therefore, the following code will ensure the Deployment size is the same as defined
 	// via the Size spec of the Custom Resource which we are reconciling.
@@ -258,7 +259,7 @@ func (r *NginxReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 				Message: fmt.Sprintf("Failed to update the size for the custom resource (%s): (%s)", nginx.Name, err)})
 
 			if err := r.Status().Update(ctx, nginx); err != nil {
-				log.Error(err, "Failed to update Memcached status")
+				log.Error(err, "Failed to update Nginx status")
 				return ctrl.Result{}, err
 			}
 
@@ -277,15 +278,15 @@ func (r *NginxReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		Message: fmt.Sprintf("Deployment for custom resource (%s) with %d replicas created successfully", nginx.Name, replicas)})
 
 	if err := r.Status().Update(ctx, nginx); err != nil {
-		log.Error(err, "Failed to update Memcached status")
+		log.Error(err, "Failed to update Nginx status")
 		return ctrl.Result{}, err
 	}
 
 	return ctrl.Result{}, nil
 }
 
-// finalizeMemcached will perform the required operations before delete the CR.
-func (r *NginxReconciler) doFinalizerOperationsForMemcached(cr *guacv1alpha1.Nginx) {
+// finalizeNginx will perform the required operations before delete the CR.
+func (r *NginxReconciler) doFinalizerOperationsForNginx(cr *guacv1alpha1.Nginx) {
 	// TODO(user): Add the cleanup steps that the operator
 	// needs to do before the CR can be deleted. Examples
 	// of finalizers include performing backups and deleting
@@ -396,7 +397,7 @@ func (r *NginxReconciler) deploymentForNginx(
 							ContainerPort: *nginx.Spec.Port,
 							Name:          "nginx",
 						}},
-						Command:        []string{"nginx", "-g", "daemon-off;"},
+						Command:        []string{"nginx"},
 						ReadinessProbe: readinessProbe,
 						LivenessProbe:  livenessProbe,
 					}},
@@ -437,7 +438,7 @@ func imageForNgxinx(imagePath string) (string, error) {
 		var imageEnvVar = "NGINX_IMAGE"
 		image, found := os.LookupEnv(imageEnvVar)
 		if !found {
-			return "quay.io/gildub/nginx:latest", nil
+			return "quay.io/jitesoft/nginx:latest", nil
 		}
 		return image, nil
 	}
