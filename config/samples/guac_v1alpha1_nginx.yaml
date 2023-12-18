@@ -12,3 +12,4 @@ spec:
   # TODO(user): Add fields here
   replicas: 1
   port: 8080
+  containerImage: 'quay.io/redhattraining/hello-world-nginx'

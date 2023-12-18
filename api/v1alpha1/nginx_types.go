@@ -27,9 +27,9 @@ import (
 type NginxSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
-
-	Port     *int32 `json:"port,omitempty"`
-	Replicas *int32 `json:"replicas,omitempty"`
+	ContainerImage *string `json:"containerImage,omitempty"`
+	Port           *int32  `json:"port,omitempty"`
+	Replicas       *int32  `json:"replicas,omitempty"`
 }
 
 // NginxStatus defines the observed state of Nginx

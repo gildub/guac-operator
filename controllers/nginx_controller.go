@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -303,23 +304,16 @@ func (r *NginxReconciler) doFinalizerOperationsForMemcached(cr *guacv1alpha1.Ngi
 			cr.Namespace))
 }
 
-// deploymentForNginx returns a Memcached Deployment object
+// deploymentForNginx returns Deployment object
 func (r *NginxReconciler) deploymentForNginx(
 	nginx *guacv1alpha1.Nginx) (*appsv1.Deployment, error) {
 	ls := labelsForNginx(nginx.Name)
 	replicas := nginx.Spec.Replicas
 
 	// Get the Operand image
-	image, err := imageForNgxinx()
+	image, err := imageForNgxinx(*nginx.Spec.ContainerImage)
 	if err != nil {
 		return nil, err
-	}
-
-	NginxPublicPort := nginx.Spec.Port
-	httpGet := &corev1.HTTPGetAction{
-		Path:   "/admin/health",
-		Scheme: "HTTP",
-		Port:   intstr.IntOrString{Type: intstr.Int, IntVal: int32(NginxPublicPort)},
 	}
 
 	livenessProbe := &corev1.Probe{
@@ -328,11 +322,11 @@ func (r *NginxReconciler) deploymentForNginx(
 		TimeoutSeconds:      5,
 		FailureThreshold:    10,
 	}
-	
-    livenessProbe.HTTPGet = &corev1.HTTPGetAction{
+
+	livenessProbe.HTTPGet = &corev1.HTTPGetAction{
 		Path:   "/admin/health",
 		Scheme: "HTTP",
-		Port:   intstr.IntOrString{Type: intstr.Int, IntVal: int32(NginxPublicPort)},
+		Port:   intstr.IntOrString{Type: intstr.Int, IntVal: int32(*nginx.Spec.Port)},
 	}
 
 	readinessProbe := &corev1.Probe{
@@ -345,8 +339,8 @@ func (r *NginxReconciler) deploymentForNginx(
 	readinessProbe.HTTPGet = &corev1.HTTPGetAction{
 		Path:   "/admin/health",
 		Scheme: "HTTP",
-		Port:   intstr.IntOrString{Type: intstr.Int, IntVal: int32(NginxPublicPort)},
-	},
+		Port:   intstr.IntOrString{Type: intstr.Int, IntVal: int32(*nginx.Spec.Port)},
+	}
 
 	dep := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -402,7 +396,7 @@ func (r *NginxReconciler) deploymentForNginx(
 							ContainerPort: *nginx.Spec.Port,
 							Name:          "nginx",
 						}},
-						Command:        []string{"nginx", "-g", "daemon-off"},
+						Command:        []string{"nginx", "-g", "daemon-off;"},
 						ReadinessProbe: readinessProbe,
 						LivenessProbe:  livenessProbe,
 					}},
@@ -436,14 +430,19 @@ func labelsForNginx(name string) map[string]string {
 }
 
 // imageForNginx gets the Operand image which is managed by this controller
-// from the Nginx_IMAGE environment variable defined in the config/manager/manager.yaml
-func imageForNgxinx() (string, error) {
-	// var imageEnvVar = "NGINX_IMAGE"
-	// image, found := os.LookupEnv(imageEnvVar)
-	// if !found {
-	// 	return "", fmt.Errorf("unable to find %s environment variable with the image", imageEnvVar)
-	// }
-	return "quay.io/packit/nginx-unprivileged:latest", nil
+// if no image is specificed in nginx.spec then envar can be used
+// otherwise default to
+func imageForNgxinx(imagePath string) (string, error) {
+	if imagePath == "" {
+		var imageEnvVar = "NGINX_IMAGE"
+		image, found := os.LookupEnv(imageEnvVar)
+		if !found {
+			return "quay.io/gildub/nginx:latest", nil
+		}
+		return image, nil
+	}
+	return imagePath, nil
+
 }
 
 // SetupWithManager sets up the controller with the Manager.
