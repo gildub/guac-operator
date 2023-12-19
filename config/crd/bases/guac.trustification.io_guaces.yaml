@@ -5,20 +5,20 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.11.1
   creationTimestamp: null
-  name: nginxes.guac.trustification.io
+  name: guaces.guac.trustification.io
 spec:
   group: guac.trustification.io
   names:
-    kind: Nginx
-    listKind: NginxList
-    plural: nginxes
-    singular: nginx
+    kind: Guac
+    listKind: GuacList
+    plural: guaces
+    singular: guac
   scope: Namespaced
   versions:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: Nginx is the Schema for the nginxes API
+        description: Guac is the Schema for the guaces API
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -33,7 +33,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: NginxSpec defines the desired state of Nginx
+            description: GuacSpec defines the desired state of Guac
             properties:
               containerImage:
                 description: 'INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
@@ -47,7 +47,7 @@ spec:
                 type: integer
             type: object
           status:
-            description: NginxStatus defines the observed state of Nginx
+            description: GuacStatus defines the observed state of Guac
             properties:
               conditions:
                 items:

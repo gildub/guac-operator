@@ -1,0 +1,22 @@
+apiVersion: guac.trustification.io/v1alpha1
+kind: Guac
+metadata:
+  labels:
+    app.kubernetes.io/name: guac
+    app.kubernetes.io/instance: guac-instance
+    app.kubernetes.io/part-of: guac-operator
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: guac-operator
+    app.kubernetes.io/app: guac
+  name: guac-instance
+spec:  
+  selector:
+    matchLabels:
+      app: guac
+  replicas: 3
+  port: 8080
+  containerImage: 'quay.io/centos7/httpd-24-centos7:latest'
+  template:
+    metadata:
+      labels:
+        app: guac

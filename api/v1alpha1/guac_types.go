@@ -23,8 +23,8 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-// NginxSpec defines the desired state of Nginx
-type NginxSpec struct {
+// GuacSpec defines the desired state of Guac
+type GuacSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 	ContainerImage *string `json:"containerImage,omitempty"`
@@ -32,8 +32,8 @@ type NginxSpec struct {
 	Replicas       *int32  `json:"replicas,omitempty"`
 }
 
-// NginxStatus defines the observed state of Nginx
-type NginxStatus struct {
+// GuacStatus defines the observed state of Guac
+type GuacStatus struct {
 	ForceRedploy string             `json:"forceRedploy,omitempty"`
 	Conditions   []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 }
@@ -41,24 +41,24 @@ type NginxStatus struct {
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 
-// Nginx is the Schema for the nginxes API
-type Nginx struct {
+// Guac is the Schema for the guaces API
+type Guac struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   NginxSpec   `json:"spec,omitempty"`
-	Status NginxStatus `json:"status,omitempty"`
+	Spec   GuacSpec   `json:"spec,omitempty"`
+	Status GuacStatus `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true
 
-// NginxList contains a list of Nginx
-type NginxList struct {
+// GuacList contains a list of Guac
+type GuacList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []Nginx `json:"items"`
+	Items           []Guac `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&Nginx{}, &NginxList{})
+	SchemeBuilder.Register(&Guac{}, &GuacList{})
 }

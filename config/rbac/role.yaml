@@ -35,7 +35,13 @@ rules:
 - apiGroups:
   - guac.trustification.io
   resources:
-  - nginxes
+  - guac/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - guac.trustification.io
+  resources:
+  - guaces
   verbs:
   - create
   - delete
@@ -47,13 +53,13 @@ rules:
 - apiGroups:
   - guac.trustification.io
   resources:
-  - nginxes/finalizers
+  - guaces/finalizers
   verbs:
   - update
 - apiGroups:
   - guac.trustification.io
   resources:
-  - nginxes/status
+  - guaces/status
   verbs:
   - get
   - patch

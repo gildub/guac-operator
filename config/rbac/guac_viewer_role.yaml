@@ -1,31 +1,27 @@
-# permissions for end users to edit nginxes.
+# permissions for end users to view guaces.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   labels:
     app.kubernetes.io/name: clusterrole
-    app.kubernetes.io/instance: nginx-editor-role
+    app.kubernetes.io/instance: guac-viewer-role
     app.kubernetes.io/component: rbac
     app.kubernetes.io/created-by: guac-operator
     app.kubernetes.io/part-of: guac-operator
     app.kubernetes.io/managed-by: kustomize
-  name: nginx-editor-role
+  name: guac-viewer-role
 rules:
 - apiGroups:
   - guac.trustification.io
   resources:
-  - nginxes
+  - guaces
   verbs:
-  - create
-  - delete
   - get
   - list
-  - patch
-  - update
   - watch
 - apiGroups:
   - guac.trustification.io
   resources:
-  - nginxes/status
+  - guaces/status
   verbs:
   - get
