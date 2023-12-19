@@ -3,11 +3,11 @@ kind: Guac
 metadata:
   labels:
     app.kubernetes.io/name: guac
-    app.kubernetes.io/instance: guac-instance
+    app.kubernetes.io/instance: guac
     app.kubernetes.io/part-of: guac-operator
     app.kubernetes.io/managed-by: kustomize
     app.kubernetes.io/created-by: guac-operator
-  name: guac-instance
+  name: guac
 spec:  
   selector:
     matchLabels:
