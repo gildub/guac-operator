@@ -35,12 +35,6 @@ rules:
 - apiGroups:
   - guac.trustification.io
   resources:
-  - guac/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - guac.trustification.io
-  resources:
   - guaces
   verbs:
   - create

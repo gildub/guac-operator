@@ -7,7 +7,6 @@ metadata:
     app.kubernetes.io/part-of: guac-operator
     app.kubernetes.io/managed-by: kustomize
     app.kubernetes.io/created-by: guac-operator
-    app.kubernetes.io/app: guac
   name: guac-instance
 spec:  
   selector:
