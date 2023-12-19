@@ -66,7 +66,7 @@ type NginxReconciler struct {
 //+kubebuilder:rbac:groups=guac.trustification.io,resources=nginxes/finalizers,verbs=update
 //+kubebuilder:rbac:groups=core,resources=events,verbs=create;patch
 //+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch
+//+kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch// +kubebuilder:rbac:groups=memcached.openstack.org,resources=memcacheds/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -208,7 +208,7 @@ func (r *NginxReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 				Message: fmt.Sprintf("Failed to create Deployment for the custom resource (%s): (%s)", nginx.Name, err)})
 
 			if err := r.Status().Update(ctx, nginx); err != nil {
-				log.Error(err, "Failed to update Nginx status")
+				log.Error(err, "Reconcile existing deployment: Failed to update Nginx status")
 				return ctrl.Result{}, err
 			}
 
@@ -241,7 +241,7 @@ func (r *NginxReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	if *found.Spec.Replicas != *replicas {
 		found.Spec.Replicas = replicas
 		if err = r.Update(ctx, found); err != nil {
-			log.Error(err, "Failed to update Deployment",
+			log.Error(err, "Reconcile replicas: Failed to update Deployment",
 				"Deployment.Namespace", found.Namespace, "Deployment.Name", found.Name)
 
 			// Re-fetch the nginx Custom Resource before update the status
@@ -259,7 +259,7 @@ func (r *NginxReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 				Message: fmt.Sprintf("Failed to update the size for the custom resource (%s): (%s)", nginx.Name, err)})
 
 			if err := r.Status().Update(ctx, nginx); err != nil {
-				log.Error(err, "Failed to update Nginx status")
+				log.Error(err, "Update status after reconcile replicas failes: Failed to update Nginx status")
 				return ctrl.Result{}, err
 			}
 
@@ -397,9 +397,8 @@ func (r *NginxReconciler) deploymentForNginx(
 							ContainerPort: *nginx.Spec.Port,
 							Name:          "nginx",
 						}},
-						Command:        []string{"nginx"},
-						ReadinessProbe: readinessProbe,
-						LivenessProbe:  livenessProbe,
+						// Command:        []string{"nginx"},
+
 					}},
 				},
 			},
@@ -438,7 +437,7 @@ func imageForNgxinx(imagePath string) (string, error) {
 		var imageEnvVar = "NGINX_IMAGE"
 		image, found := os.LookupEnv(imageEnvVar)
 		if !found {
-			return "quay.io/jitesoft/nginx:latest", nil
+			return "quay.io/openshift/httpd:latest", nil
 		}
 		return image, nil
 	}

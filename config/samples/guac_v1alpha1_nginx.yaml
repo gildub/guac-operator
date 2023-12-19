@@ -10,6 +10,6 @@ metadata:
   name: nginx-sample
 spec:
   # TODO(user): Add fields here
-  replicas: 0
+  replicas: 1
   port: 8080
-  containerImage: 'quay.io/redhattraining/hello-world-nginx'
+  containerImage: 'quay.io/openshift/httpd:latest'
