@@ -100,7 +100,9 @@ func (r *GuacReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		return ctrl.Result{}, err
 	}
 
-	log.Info("status: %+v\n", guac.Status)
+	// {"controller": "guac", "controllerGroup": "guac.trustification.io", "controllerKind": "Guac", "Guac": {"name":"guac","namespace":"default"}, "namespace": "default", "name": "guac", "reconcileID": "ddded10e-f69b-47cb-ad16-1f29d717cfb7"}
+	// 2023-12-20T18:17:58+01:00	INFO	status: {ForceRedploy: Conditions:[{Type:Available Status:True ObservedGeneration:0 LastTransitionTime:2023-12-20 18:17:45 +0100 CET Reason:Reconciling Message:Deployment for custom resource (guac) with 824641750672 replicas created successfully}]}
+
 	// Let's just set the status as Unknown when no status are available
 	if guac.Status.Conditions == nil || len(guac.Status.Conditions) == 0 {
 		meta.SetStatusCondition(&guac.Status.Conditions, metav1.Condition{Type: typeAvailableGuac, Status: metav1.ConditionUnknown, Reason: "Reconciling", Message: "Starting reconciliation"})
@@ -273,14 +275,29 @@ func (r *GuacReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		return ctrl.Result{Requeue: true}, nil
 	}
 
+	// res := fmt.Sprintf("status conditions: %+v\n", guac.Status)
+	// log.Info(res)
+
+	err = r.Get(ctx, req.NamespacedName, guac)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			// If the custom resource is not found then, it usually means that it was deleted or not created
+			// In this way, we will stop the reconciliation
+			log.Info("guac resource not found. Ignoring since object must be deleted")
+			return ctrl.Result{}, nil
+		}
+		// Error reading the object - requeue the request.
+		log.Error(err, "Failed to get guac")
+		return ctrl.Result{}, err
+	}
+
 	// The following implementation will update the status
 	meta.SetStatusCondition(&guac.Status.Conditions, metav1.Condition{Type: typeAvailableGuac,
 		Status: metav1.ConditionTrue, Reason: "Reconciling",
 		Message: fmt.Sprintf("Deployment for custom resource (%s) with %d replicas created successfully", guac.Name, replicas)})
-
 	if err := r.Status().Update(ctx, guac); err != nil {
 		log.Error(err, "Failed to update Guac status")
-		return ctrl.Result{}, err
+		return ctrl.Result{}, nil
 	}
 
 	return ctrl.Result{}, nil

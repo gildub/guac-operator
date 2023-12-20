@@ -42,9 +42,10 @@ type GuacStatus struct {
 	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 }
 
-// Guac is the Schema for the guaces API
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+
+// Guac is the Schema for the guaces API
 type Guac struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
