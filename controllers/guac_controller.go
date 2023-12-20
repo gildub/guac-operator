@@ -100,6 +100,7 @@ func (r *GuacReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		return ctrl.Result{}, err
 	}
 
+	log.Info("status: %+v\n", guac.Status)
 	// Let's just set the status as Unknown when no status are available
 	if guac.Status.Conditions == nil || len(guac.Status.Conditions) == 0 {
 		meta.SetStatusCondition(&guac.Status.Conditions, metav1.Condition{Type: typeAvailableGuac, Status: metav1.ConditionUnknown, Reason: "Reconciling", Message: "Starting reconciliation"})
