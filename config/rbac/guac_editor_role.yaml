@@ -1,4 +1,4 @@
-# permissions for end users to edit guaces.
+# permissions for end users to edit guacs.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -12,9 +12,9 @@ metadata:
   name: guac-editor-role
 rules:
 - apiGroups:
-  - guac.trustification.io
+  - httpd.trustification.io
   resources:
-  - guaces
+  - guacs
   verbs:
   - create
   - delete
@@ -24,8 +24,8 @@ rules:
   - update
   - watch
 - apiGroups:
-  - guac.trustification.io
+  - httpd.trustification.io
   resources:
-  - guaces/status
+  - guacs/status
   verbs:
   - get

@@ -1,4 +1,4 @@
-apiVersion: guac.trustification.io/v1alpha1
+apiVersion: httpd.trustification.io/v1alpha1
 kind: Guac
 metadata:
   labels:

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controllers
+package controller
 
 import (
 	"context"
@@ -25,8 +25,8 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -36,17 +36,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	guacv1alpha1 "github.com/gildub/guac-operator/api/v1alpha1"
-)
-
-const GuacFinalizer = "operator.trustification.io/finalizer"
-
-// Definitions to manage status conditions
-const (
-	// typeAvailableGuac represents the status of the Deployment reconciliation
-	typeAvailableGuac = "Available"
-	// typeDegradedGuac represents the status used when the custom resource is deleted and the finalizer operations are must to occur.
-	typeDegradedGuac = "Degraded"
+	httpdv1alpha1 "github.com/gildub/guac-operator/api/v1alpha1"
 )
 
 // GuacReconciler reconciles a Guac object
@@ -56,36 +46,29 @@ type GuacReconciler struct {
 	Recorder record.EventRecorder
 }
 
-// The following markers are used to generate the rules permissions (RBAC) on config/rbac using controller-gen
-// when the command <make manifests> is executed.
-// To know more about markers see: https://book.kubebuilder.io/reference/markers.html
-
-//+kubebuilder:rbac:groups=guac.trustification.io,resources=guaces,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=guac.trustification.io,resources=guaces/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=guac.trustification.io,resources=guaces/finalizers,verbs=update
+//+kubebuilder:rbac:groups=httpd.trustification.io,resources=guacs,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=httpd.trustification.io,resources=guacs/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=httpd.trustification.io,resources=guacs/finalizers,verbs=update
 //+kubebuilder:rbac:groups=core,resources=events,verbs=create;patch
 //+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
-
-// It is essential for the controller's reconciliation loop to be idempotent. By following the Operator
-// pattern you will create Controllers which provide a reconcile function
-// responsible for synchronizing resources until the desired state is reached on the cluster.
-// Breaking this recommendation goes against the design principles of controller-runtime.
-// and may lead to unforeseen consequences such as resources becoming stuck and requiring manual intervention.
-// For further info:
-// - About Operator Pattern: https://kubernetes.io/docs/concepts/extend-kubernetes/operator/
-// - About Controllers: https://kubernetes.io/docs/concepts/architecture/controller/
-// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.1/pkg/reconcile
+// TODO(user): Modify the Reconcile function to compare the state specified by
+// the Guac object against the actual cluster state, and then
+// perform operations to make the cluster state reflect the state specified by
+// the user.
+//
+// For more details, check Reconcile and its Result here:
+// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.15.0/pkg/reconcile
 func (r *GuacReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := log.FromContext(ctx)
 
 	// Fetch the Guac instance
 	// The purpose is check if the Custom Resource for the Kind Guac
 	// is applied on the cluster if not we return nil to stop the reconciliation
-	guac := &guacv1alpha1.Guac{}
+	guac := &httpdv1alpha1.Guac{}
 	err := r.Get(ctx, req.NamespacedName, guac)
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -151,8 +134,7 @@ func (r *GuacReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 
 	return ctrl.Result{}, nil
 }
-
-func (r *GuacReconciler) serviceForGuac(guac *guacv1alpha1.Guac) *corev1.Service {
+func (r *GuacReconciler) serviceForGuac(guac *httpdv1alpha1.Guac) *corev1.Service {
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      guac.Name + "-service",
@@ -177,7 +159,7 @@ func (r *GuacReconciler) serviceForGuac(guac *guacv1alpha1.Guac) *corev1.Service
 }
 
 // deploymentForGuac returns Deployment object
-func (r *GuacReconciler) deploymentForGuac(guac *guacv1alpha1.Guac) (*appsv1.Deployment, error) {
+func (r *GuacReconciler) deploymentForGuac(guac *httpdv1alpha1.Guac) (*appsv1.Deployment, error) {
 	ls := labelsForGuac(guac.Name)
 	replicas := guac.Spec.Replicas
 
@@ -328,11 +310,9 @@ func imageForGuac(imagePath string) (string, error) {
 }
 
 // SetupWithManager sets up the controller with the Manager.
-// Note that the Deployment will be also watched in order to ensure its
-// desirable state on the cluster
 func (r *GuacReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&guacv1alpha1.Guac{}).
+		For(&httpdv1alpha1.Guac{}).
 		Owns(&appsv1.Deployment{}).
 		Complete(r)
 }

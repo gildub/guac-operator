@@ -1,4 +1,4 @@
-# permissions for end users to view guaces.
+# permissions for end users to view guacs.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -12,16 +12,16 @@ metadata:
   name: guac-viewer-role
 rules:
 - apiGroups:
-  - guac.trustification.io
+  - httpd.trustification.io
   resources:
-  - guaces
+  - guacs
   verbs:
   - get
   - list
   - watch
 - apiGroups:
-  - guac.trustification.io
+  - httpd.trustification.io
   resources:
-  - guaces/status
+  - guacs/status
   verbs:
   - get

@@ -27,6 +27,7 @@ import (
 type GuacSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
+
 	// +operator-sdk:csv:customresourcedefinitions:type=spec
 	ContainerImage *string `json:"containerImage,omitempty"`
 	// +operator-sdk:csv:customresourcedefinitions:type=spec
@@ -37,16 +38,18 @@ type GuacSpec struct {
 
 // GuacStatus defines the observed state of Guac
 type GuacStatus struct {
+	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
+	// Important: Run "make" to regenerate code after modifying this file
 	Nodes        *[]string `json:"nodes,omitempty"`
 	ForceRedploy string    `json:"forceRedploy,omitempty"`
 	// +operator-sdk:csv:customresourcedefinitions:type=status
 	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 }
 
-// +kubebuilder:object:root=true
-// +kubebuilder:subresource:status
+//+kubebuilder:object:root=true
+//+kubebuilder:subresource:status
 
-// Guac is the Schema for the guaces API
+// Guac is the Schema for the guacs API
 type Guac struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
