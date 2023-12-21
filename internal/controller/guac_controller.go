@@ -95,6 +95,12 @@ func (r *GuacReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 			return ctrl.Result{}, err
 		}
 		// Deployment created successfully - return and requeue
+		svc, _ := r.serviceForGuac(guac)
+		err = r.Create(ctx, svc)
+		if err != nil {
+			log.Error(err, "Failed to create new Service", "Service.Namespace", svc.Namespace, "Deployment.Name", svc.Name)
+			return ctrl.Result{}, err
+		}
 		return ctrl.Result{Requeue: true, RequeueAfter: 10 * time.Second}, nil
 	} else if err != nil {
 		log.Error(err, "Failed to get Deployment")
@@ -134,8 +140,9 @@ func (r *GuacReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 
 	return ctrl.Result{}, nil
 }
-func (r *GuacReconciler) serviceForGuac(guac *httpdv1alpha1.Guac) *corev1.Service {
-	return &corev1.Service{
+
+func (r *GuacReconciler) serviceForGuac(guac *httpdv1alpha1.Guac) (*corev1.Service, error) {
+	svc := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      guac.Name + "-service",
 			Namespace: guac.Namespace,
@@ -156,6 +163,13 @@ func (r *GuacReconciler) serviceForGuac(guac *httpdv1alpha1.Guac) *corev1.Servic
 			},
 		},
 	}
+
+	// Set the ownerRef for the Deployment
+	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/owners-dependents/
+	if err := ctrl.SetControllerReference(guac, svc, r.Scheme); err != nil {
+		return nil, err
+	}
+	return svc, nil
 }
 
 // deploymentForGuac returns Deployment object

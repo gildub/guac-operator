@@ -1,5 +1,6 @@
 apiVersion: httpd.trustification.io/v1alpha1
 kind: Guac
+namespace: default
 metadata:
   labels:
     app.kubernetes.io/name: guac
