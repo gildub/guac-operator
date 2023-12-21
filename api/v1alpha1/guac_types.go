@@ -37,7 +37,8 @@ type GuacSpec struct {
 
 // GuacStatus defines the observed state of Guac
 type GuacStatus struct {
-	ForceRedploy string `json:"forceRedploy,omitempty"`
+	Nodes        *[]string `json:"nodes,omitempty"`
+	ForceRedploy string    `json:"forceRedploy,omitempty"`
 	// +operator-sdk:csv:customresourcedefinitions:type=status
 	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 }

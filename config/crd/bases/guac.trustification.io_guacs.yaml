@@ -119,6 +119,10 @@ spec:
                 type: array
               forceRedploy:
                 type: string
+              nodes:
+                items:
+                  type: string
+                type: array
             type: object
         type: object
     served: true

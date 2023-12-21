@@ -18,15 +18,15 @@ package controllers
 
 import (
 	"context"
-	"fmt"
 	"os"
+	"reflect"
 	"strings"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/errors"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -34,7 +34,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	guacv1alpha1 "github.com/gildub/guac-operator/api/v1alpha1"
@@ -89,7 +88,7 @@ func (r *GuacReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	guac := &guacv1alpha1.Guac{}
 	err := r.Get(ctx, req.NamespacedName, guac)
 	if err != nil {
-		if apierrors.IsNotFound(err) {
+		if errors.IsNotFound(err) {
 			// If the custom resource is not found then, it usually means that it was deleted or not created
 			// In this way, we will stop the reconciliation
 			log.Info("guac resource not found. Ignoring since object must be deleted")
@@ -100,237 +99,90 @@ func (r *GuacReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		return ctrl.Result{}, err
 	}
 
-	// {"controller": "guac", "controllerGroup": "guac.trustification.io", "controllerKind": "Guac", "Guac": {"name":"guac","namespace":"default"}, "namespace": "default", "name": "guac", "reconcileID": "ddded10e-f69b-47cb-ad16-1f29d717cfb7"}
-	// 2023-12-20T18:17:58+01:00	INFO	status: {ForceRedploy: Conditions:[{Type:Available Status:True ObservedGeneration:0 LastTransitionTime:2023-12-20 18:17:45 +0100 CET Reason:Reconciling Message:Deployment for custom resource (guac) with 824641750672 replicas created successfully}]}
-
-	// Let's just set the status as Unknown when no status are available
-	if guac.Status.Conditions == nil || len(guac.Status.Conditions) == 0 {
-		meta.SetStatusCondition(&guac.Status.Conditions, metav1.Condition{Type: typeAvailableGuac, Status: metav1.ConditionUnknown, Reason: "Reconciling", Message: "Starting reconciliation"})
-		if err = r.Status().Update(ctx, guac); err != nil {
-			log.Error(err, "Failed to update Guac status")
-			return ctrl.Result{}, err
-		}
-
-		// Let's re-fetch the guac Custom Resource after update the status
-		// so that we have the latest state of the resource on the cluster and we will avoid
-		// raise the issue "the object has been modified, please apply
-		// your changes to the latest version and try again" which would re-trigger the reconciliation
-		// if we try to update it again in the following operations
-		if err := r.Get(ctx, req.NamespacedName, guac); err != nil {
-			log.Error(err, "Failed to re-fetch guac")
-			return ctrl.Result{}, err
-		}
-	}
-
-	// Let's add a finalizer. Then, we can define some operations which should
-	// occurs before the custom resource to be deleted.
-	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/finalizers
-	if !controllerutil.ContainsFinalizer(guac, GuacFinalizer) {
-		log.Info("Adding Finalizer for guac")
-		if ok := controllerutil.AddFinalizer(guac, GuacFinalizer); !ok {
-			log.Error(err, "Failed to add finalizer into the custom resource")
-			// return ctrl.Result{Requeue: true}, nil
-			return ctrl.Result{}, nil
-		}
-
-		if err = r.Update(ctx, guac); err != nil {
-			log.Error(err, "Failed to update custom resource to add finalizer")
-			return ctrl.Result{}, err
-		}
-	}
-
-	// Check if the Guac instance is marked to be deleted, which is
-	// indicated by the deletion timestamp being set.
-	isGuacMarkedToBeDeleted := guac.GetDeletionTimestamp() != nil
-	if isGuacMarkedToBeDeleted {
-		if controllerutil.ContainsFinalizer(guac, GuacFinalizer) {
-			log.Info("Performing Finalizer Operations for Guac before delete CR")
-
-			// Let's add here an status "Downgrade" to define that this resource begin its process to be terminated.
-			meta.SetStatusCondition(&guac.Status.Conditions, metav1.Condition{Type: typeDegradedGuac,
-				Status: metav1.ConditionUnknown, Reason: "Finalizing",
-				Message: fmt.Sprintf("Performing finalizer operations for the custom resource: %s ", guac.Name)})
-
-			if err := r.Status().Update(ctx, guac); err != nil {
-				log.Error(err, "Failed to update Guac status")
-				return ctrl.Result{}, err
-			}
-
-			// Perform all operations required before remove the finalizer and allow
-			// the Kubernetes API to remove the custom resource.
-			r.doFinalizerOperationsForGuac(guac)
-
-			// TODO(user): If you add operations to the doFinalizerOperationsForGuac method
-			// then you need to ensure that all worked fine before deleting and updating the Downgrade status
-			// otherwise, you should requeue here.
-
-			// Re-fetch the guac Custom Resource before update the status
-			// so that we have the latest state of the resource on the cluster and we will avoid
-			// raise the issue "the object has been modified, please apply
-			// your changes to the latest version and try again" which would re-trigger the reconciliation
-			if err := r.Get(ctx, req.NamespacedName, guac); err != nil {
-				log.Error(err, "Failed to re-fetch guac")
-				return ctrl.Result{}, err
-			}
-
-			meta.SetStatusCondition(&guac.Status.Conditions, metav1.Condition{Type: typeDegradedGuac,
-				Status: metav1.ConditionTrue, Reason: "Finalizing",
-				Message: fmt.Sprintf("Finalizer operations for custom resource %s name were successfully accomplished", guac.Name)})
-
-			if err := r.Status().Update(ctx, guac); err != nil {
-				log.Error(err, "Failed to update Guac status")
-				return ctrl.Result{}, err
-			}
-
-			log.Info("Removing Finalizer for Guac after successfully perform the operations")
-			if ok := controllerutil.RemoveFinalizer(guac, GuacFinalizer); !ok {
-				log.Error(err, "Failed to remove finalizer for Guac")
-				return ctrl.Result{Requeue: true}, nil
-			}
-
-			if err := r.Update(ctx, guac); err != nil {
-				log.Error(err, "Failed to remove finalizer for Guac")
-				return ctrl.Result{}, err
-			}
-		}
-		return ctrl.Result{}, nil
-	}
-
-	// Check if the deployment already exists, if not create a new one
+	// Check if the deployment already exists, if not create a new deployment.
 	found := &appsv1.Deployment{}
 	err = r.Get(ctx, types.NamespacedName{Name: guac.Name, Namespace: guac.Namespace}, found)
-	if err != nil && apierrors.IsNotFound(err) {
+	if err != nil && errors.IsNotFound(err) {
 		// Define a new deployment
-		dep, err := r.deploymentForGuac(guac)
+		dep, _ := r.deploymentForGuac(guac)
+		log.Info("Creating a new Deployment", "Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
+		err = r.Create(ctx, dep)
 		if err != nil {
-			log.Error(err, "Failed to define new Deployment resource for Guac")
-
-			// The following implementation will update the status
-			meta.SetStatusCondition(&guac.Status.Conditions, metav1.Condition{Type: typeAvailableGuac,
-				Status: metav1.ConditionFalse, Reason: "Reconciling",
-				Message: fmt.Sprintf("Failed to create Deployment for the custom resource (%s): (%s)", guac.Name, err)})
-
-			if err := r.Status().Update(ctx, guac); err != nil {
-				log.Error(err, "Reconcile existing deployment: Failed to update Guac status")
-				return ctrl.Result{}, err
-			}
-
+			log.Error(err, "Failed to create new Deployment", "Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
 			return ctrl.Result{}, err
 		}
-
-		log.Info("Creating a new Deployment",
-			"Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
-		if err = r.Create(ctx, dep); err != nil {
-			log.Error(err, "Failed to create new Deployment",
-				"Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
-			return ctrl.Result{}, err
-		}
-
-		// Deployment created successfully
-		// We will requeue the reconciliation so that we can ensure the state
-		// and move forward for the next operations
-		return ctrl.Result{RequeueAfter: time.Minute}, nil
+		// Deployment created successfully - return and requeue
+		return ctrl.Result{Requeue: true, RequeueAfter: 10 * time.Second}, nil
 	} else if err != nil {
 		log.Error(err, "Failed to get Deployment")
-		// Let's return the error for the reconciliation be re-trigged again
 		return ctrl.Result{}, err
 	}
 
-	// The CRD API is defining that the Guac type, have a GuacSpec.Size field
-	// to set the quantity of Deployment instances is the desired state on the cluster.
-	// Therefore, the following code will ensure the Deployment size is the same as defined
-	// via the Size spec of the Custom Resource which we are reconciling.
-	replicas := guac.Spec.Replicas
-	if *found.Spec.Replicas != *replicas {
-		found.Spec.Replicas = replicas
+	// Ensure the deployment size is the same as the spec.
+	size := guac.Spec.Replicas
+	if found.Spec.Replicas != size {
+		found.Spec.Replicas = size
 		if err = r.Update(ctx, found); err != nil {
-			log.Error(err, "Reconcile replicas: Failed to update Deployment",
-				"Deployment.Namespace", found.Namespace, "Deployment.Name", found.Name)
-
-			// Re-fetch the guac Custom Resource before update the status
-			// so that we have the latest state of the resource on the cluster and we will avoid
-			// raise the issue "the object has been modified, please apply
-			// your changes to the latest version and try again" which would re-trigger the reconciliation
-			if err := r.Get(ctx, req.NamespacedName, guac); err != nil {
-				log.Error(err, "Failed to re-fetch guac")
-				return ctrl.Result{}, err
-			}
-
-			// The following implementation will update the status
-			meta.SetStatusCondition(&guac.Status.Conditions, metav1.Condition{Type: typeAvailableGuac,
-				Status: metav1.ConditionFalse, Reason: "Resizing",
-				Message: fmt.Sprintf("Failed to update the size for the custom resource (%s): (%s)", guac.Name, err)})
-
-			if err := r.Status().Update(ctx, guac); err != nil {
-				log.Error(err, "Update status after reconcile replicas failes: Failed to update Guac status")
-				return ctrl.Result{}, err
-			}
-
 			return ctrl.Result{}, err
 		}
-
-		// Now, that we update the size we want to requeue the reconciliation
-		// so that we can ensure that we have the latest state of the resource before
-		// update. Also, it will help ensure the desired state on the cluster
-		return ctrl.Result{Requeue: true}, nil
+		return ctrl.Result{Requeue: true, RequeueAfter: 10 * time.Second}, nil
 	}
 
-	// res := fmt.Sprintf("status conditions: %+v\n", guac.Status)
-	// log.Info(res)
-
-	err = r.Get(ctx, req.NamespacedName, guac)
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			// If the custom resource is not found then, it usually means that it was deleted or not created
-			// In this way, we will stop the reconciliation
-			log.Info("guac resource not found. Ignoring since object must be deleted")
-			return ctrl.Result{}, nil
-		}
-		// Error reading the object - requeue the request.
-		log.Error(err, "Failed to get guac")
+	// Update the Guac status with the pod names.
+	// List the pods for this CR's deployment.
+	podList := &corev1.PodList{}
+	listOpts := []client.ListOption{
+		client.InNamespace(guac.Namespace),
+		client.MatchingLabels(labelsForApp(guac.Name)),
+	}
+	if err = r.List(ctx, podList, listOpts...); err != nil {
 		return ctrl.Result{}, err
 	}
+	podNames := getPodNames(podList.Items)
 
-	// The following implementation will update the status
-	meta.SetStatusCondition(&guac.Status.Conditions, metav1.Condition{Type: typeAvailableGuac,
-		Status: metav1.ConditionTrue, Reason: "Reconciling",
-		Message: fmt.Sprintf("Deployment for custom resource (%s) with %d replicas created successfully", guac.Name, replicas)})
-	if err := r.Status().Update(ctx, guac); err != nil {
-		log.Error(err, "Failed to update Guac status")
-		return ctrl.Result{}, nil
+	// Update status.Nodes if needed.
+	if !reflect.DeepEqual(podNames, guac.Status.Nodes) {
+		guac.Status.Nodes = &podNames
+		if err := r.Status().Update(ctx, guac); err != nil {
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{Requeue: true, RequeueAfter: 10 * time.Second}, nil
 	}
 
 	return ctrl.Result{}, nil
 }
 
-// finalizeGuac will perform the required operations before delete the CR.
-func (r *GuacReconciler) doFinalizerOperationsForGuac(cr *guacv1alpha1.Guac) {
-	// TODO(user): Add the cleanup steps that the operator
-	// needs to do before the CR can be deleted. Examples
-	// of finalizers include performing backups and deleting
-	// resources that are not owned by this CR, like a PVC.
-
-	// Note: It is not recommended to use finalizers with the purpose of delete resources which are
-	// created and managed in the reconciliation. These ones, such as the Deployment created on this reconcile,
-	// are defined as depended of the custom resource. See that we use the method ctrl.SetControllerReference.
-	// to set the ownerRef which means that the Deployment will be deleted by the Kubernetes API.
-	// More info: https://kubernetes.io/docs/tasks/administer-cluster/use-cascading-deletion/
-
-	// The following implementation will raise an event
-	r.Recorder.Event(cr, "Warning", "Deleting",
-		fmt.Sprintf("Custom Resource %s is being deleted from the namespace %s",
-			cr.Name,
-			cr.Namespace))
+func (r *GuacReconciler) serviceForGuac(guac *guacv1alpha1.Guac) *corev1.Service {
+	return &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      guac.Name + "-service",
+			Namespace: guac.Namespace,
+			Labels: map[string]string{
+				"app.kubernetes.io/app": "guac",
+			},
+		},
+		Spec: corev1.ServiceSpec{
+			Selector: map[string]string{
+				"app.kubernetes.io/app": "guac",
+			},
+			Ports: []corev1.ServicePort{
+				{
+					Protocol:   corev1.ProtocolTCP,
+					Port:       8080,
+					TargetPort: intstr.FromInt(8080),
+				},
+			},
+		},
+	}
 }
 
 // deploymentForGuac returns Deployment object
-func (r *GuacReconciler) deploymentForGuac(
-	guac *guacv1alpha1.Guac) (*appsv1.Deployment, error) {
+func (r *GuacReconciler) deploymentForGuac(guac *guacv1alpha1.Guac) (*appsv1.Deployment, error) {
 	ls := labelsForGuac(guac.Name)
 	replicas := guac.Spec.Replicas
 
 	// Get the Operand image
-	image, err := imageForNgxinx(*guac.Spec.ContainerImage)
+	image, err := imageForGuac(*guac.Spec.ContainerImage)
 	if err != nil {
 		return nil, err
 	}
@@ -386,8 +238,9 @@ func (r *GuacReconciler) deploymentForGuac(
 						},
 					},
 					Containers: []corev1.Container{{
-						Image:           image,
-						Name:            "guac",
+						Image: image,
+						Name:  "guac",
+						// Command:        []string{"guac"},
 						ImagePullPolicy: corev1.PullIfNotPresent,
 						// Ensure restrictive context for the container
 						// More info: https://kubernetes.io/docs/concepts/security/pod-security-standards/#restricted
@@ -415,8 +268,6 @@ func (r *GuacReconciler) deploymentForGuac(
 							ContainerPort: *guac.Spec.Port,
 							Name:          "guac",
 						}},
-						// Command:        []string{"guac"},
-
 					}},
 				},
 			},
@@ -431,14 +282,26 @@ func (r *GuacReconciler) deploymentForGuac(
 	return dep, nil
 }
 
+// labelsForApp creates a simple set of labels for Memcached.
+func labelsForApp(name string) map[string]string {
+	return map[string]string{"cr_name": name}
+}
+
+// getPodNames returns the pod names of the array of pods passed in
+func getPodNames(pods []corev1.Pod) []string {
+	var podNames []string
+	for _, pod := range pods {
+		podNames = append(podNames, pod.Name)
+	}
+	return podNames
+}
+
 // labelsForGuac returns the labels for selecting the resources
 // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/common-labels/
 func labelsForGuac(name string) map[string]string {
-	// var imageTag string
-	// image, err := imageForNgxinx()
-	// if err == nil {
+
 	imageTag := strings.Split("guac:latest", ":")[1]
-	// }
+
 	return map[string]string{"app.kubernetes.io/name": "Guac",
 		"app.kubernetes.io/app":        "guac",
 		"app.kubernetes.io/instance":   name,
@@ -451,7 +314,7 @@ func labelsForGuac(name string) map[string]string {
 // imageForGuac gets the Operand image which is managed by this controller
 // if no image is specificed in guac.spec then envar can be used
 // otherwise default to
-func imageForNgxinx(imagePath string) (string, error) {
+func imageForGuac(imagePath string) (string, error) {
 	if imagePath == "" {
 		var imageEnvVar = "GUAC_IMAGE"
 		image, found := os.LookupEnv(imageEnvVar)
